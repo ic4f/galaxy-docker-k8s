@@ -1,0 +1,42 @@
+---
+##
+## This file is managed by Ansible.  ALL CHANGES WILL BE OVERWRITTEN.
+##
+
+uwsgi:
+    virtualenv: /galaxy/server/.venv
+    processes: 1
+    http: 0.0.0.0:8080
+    static-map: /static/style=/galaxy/server/static/style/blue
+    static-map: /static=/galaxy/server/static
+    pythonpath: /galaxy/server/lib
+    thunder-lock: true
+    module: galaxy.webapps.galaxy.buildapp:uwsgi_app()
+    buffer-size: 16384
+    die-on-term: true
+    threads: 4
+    offload-threads: 2
+    master: true
+    hook-master-start: unix_signal:2 gracefully_kill_them_all
+    hook-master-start: unix_signal:15 gracefully_kill_them_all
+    enable-threads: true
+    py-call-osafterfork: true
+
+galaxy:
+    citation_cache_data_dir: /galaxy/server/database/citations/data
+    citation_cache_lock_dir: /galaxy/server/database/citations/locks
+    database_connection: postgresql://postgres@gpsql/galaxy
+    external_service_type_config_file: /galaxy/server/config/external_service_types_conf.xml.sample
+    integrated_tool_panel_config: /galaxy/server/integrated_tool_panel.xml
+    job_working_directory: /galaxy/server/database/jobs
+    migrated_tools_config: /galaxy/server/migrated_tools_conf.xml
+    new_file_path: /galaxy/server/database/tmp
+    object_store_cache_path: /galaxy/server/database/object_store_cache
+    openid_consumer_cache_path: /galaxy/server/database/openid_consumer_cache
+    shed_data_manager_config_file: /galaxy/server/shed_data_manager_conf.xml
+    shed_tool_data_table_config: /galaxy/server/shed_tool_data_table_conf.xml
+    template_cache_path: /galaxy/server/database/template_cache
+    tool_config_file: /galaxy/server/config/tool_conf.xml.sample,/galaxy/server/shed_tool_conf.xml
+    tool_dependency_dir: /galaxy/server/database/dependencies
+    visualization_plugins_directory: config/plugins/visualizations
+    whoosh_index_dir: /galaxy/server/database/whoosh_cache
