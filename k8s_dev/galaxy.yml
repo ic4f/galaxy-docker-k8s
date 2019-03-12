@@ -1,0 +1,105 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: galaxy-service
+  labels:
+    app: galaxy
+spec:
+  type: NodePort
+  ports: 
+  - protocol: TCP
+    port: 8090
+    targetPort: galaxy-http
+  selector:
+    # targets pods with all these labels
+    app: galaxy
+    tier: web 
+
+---
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: galaxy-pv
+  labels:
+    app: galaxy
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 10Gi
+  accessModes:
+    #because using hostpath
+    - ReadWriteOnce
+  hostPath:
+    path: "/tmp/k8s/volumes/galaxy/data"
+
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: galaxy-pvc
+  labels:
+    app: galaxy
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+      ##TODO: review this
+      #---
+      #kind: Ingress
+      #apiVersion: extensions/v1beta1
+      #metadata:
+      #  name: galaxy-ingress
+      #spec:
+      #  rules:
+      #  - http:
+      #      paths:
+      #      # - path: /galaxy/?(.*)
+      #      - path: /
+      #        backend:
+      #          serviceName: galaxy-service
+      #          servicePort: 8090
+
+
+
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: galaxy-web-deploy
+  labels:
+    app: galaxy
+    #thiw fies the error. But why??
+    #tier: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: galaxy
+      tier: web
+  template:
+    metadata:
+      labels:
+        app: galaxy
+        tier: web
+    spec:
+      volumes: 
+        - name: galaxy-data
+          persistentVolumeClaim:
+            claimName: galaxy-pvc
+      containers:
+        - name: galaxy-web-container
+          image: nginx:1.7.9
+          #image: "galaxy/galaxy:minimal"
+          # add configmap!
+          ports:
+            - name: galaxy-http
+              containerPort: 8080
+              #command: ["/galaxy/server/.venv/bin/uwsgi"]
+              #args: ["--yaml", "/galaxy/server/config/galaxy.yml"]
+          volumeMounts:
+            - name: galaxy-data
+              mountPath: "/galaxy/server/database/"
