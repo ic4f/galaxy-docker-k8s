@@ -1,18 +1,28 @@
 kind: Service
 apiVersion: v1
 metadata:
-  name: postgres-service
+  name: gpsql
   labels:
     app: galaxy
+    tier: db
 spec:
-  #could use CluseterIP: None, but then can't pgcli from host
-  type: NodePort
+  clusterIP: None
   ports: 
-    - port: 5432
+  - port: 5432
   selector:
-    # targets pods with all these labels
     app: galaxy
-    tier: postgres 
+    tier: db 
+
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: postgres-config
+  labels:
+    app: galaxy
+    tier: db
+data:
+  POSTGRES_DB: galaxy
 
 ---
 kind: PersistentVolume
@@ -21,13 +31,13 @@ metadata:
   name: postgres-pv
   labels:
     app: galaxy
+    type: local
 spec:
   storageClassName: manual
   capacity:
     storage: 1Gi
   accessModes:
-    #because using hostpath
-    - ReadWriteOnce
+  - ReadWriteOnce
   hostPath:
     # host-specific path for pre-configured Galaxy database files
     path: "/tmp/docker/volumes/postgres"
@@ -42,20 +52,10 @@ metadata:
 spec:
   storageClassName: manual
   accessModes:
-    - ReadWriteOnce
+  - ReadWriteOnce
   resources:
     requests:
       storage: 1Gi
-
----
-kind: ConfigMap
-apiVersion: v1
-metadata:
-  name: postgres-config
-  labels:
-    app: galaxy
-data:
-  POSTGRES_DB: galaxy
 
 ---
 kind: Deployment
@@ -64,31 +64,32 @@ metadata:
   name: postgres-deploy
   labels:
     app: galaxy
+    tier: db
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: galaxy
-      tier: postgres 
+      tier: db
   template:
     metadata:
       labels:
         app: galaxy
-        tier: postgres
+        tier: db
     spec:
       volumes: 
-        - name: postgres-data
-          persistentVolumeClaim:
-            claimName: postgres-pvc
+      - name: postgres-data
+        persistentVolumeClaim:
+          claimName: postgres-pvc
       containers:
-        - name: postgres-container
-          image: postgres:10.6
-          imagePullPolicy: "IfNotPresent"
-          envFrom:
-          - configMapRef:
-              name: postgres-config
-          ports: 
-            - containerPort: 5432
-          volumeMounts:
-            - name: postgres-data
-              mountPath: "/var/lib/postgresql/data"
+      - name: postgres-container
+        image: postgres:10.6
+        imagePullPolicy: "IfNotPresent"
+        envFrom:
+        - configMapRef:
+            name: postgres-config
+        ports: 
+        - containerPort: 5432
+        volumeMounts:
+        - name: postgres-data
+          mountPath: "/var/lib/postgresql/data"

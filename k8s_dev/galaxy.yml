@@ -1,9 +1,10 @@
 kind: Service
 apiVersion: v1
 metadata:
-  name: galaxy-service
+  name: galaxy
   labels:
     app: galaxy
+    tier: web
 spec:
   type: NodePort
   ports: 
@@ -11,7 +12,6 @@ spec:
     port: 8090
     targetPort: galaxy-http
   selector:
-    # targets pods with all these labels
     app: galaxy
     tier: web 
 
@@ -22,13 +22,13 @@ metadata:
   name: galaxy-pv
   labels:
     app: galaxy
+    type: local
 spec:
   storageClassName: manual
   capacity:
     storage: 10Gi
   accessModes:
-    #because using hostpath
-    - ReadWriteOnce
+  - ReadWriteOnce
   hostPath:
     path: "/tmp/k8s/volumes/galaxy/data"
 
@@ -42,28 +42,28 @@ metadata:
 spec:
   storageClassName: manual
   accessModes:
-    - ReadWriteOnce
+  - ReadWriteOnce
   resources:
     requests:
       storage: 10Gi
 
-      ##TODO: review this
-      #---
-      #kind: Ingress
-      #apiVersion: extensions/v1beta1
-      #metadata:
-      #  name: galaxy-ingress
-      #spec:
-      #  rules:
-      #  - http:
-      #      paths:
-      #      # - path: /galaxy/?(.*)
-      #      - path: /
-      #        backend:
-      #          serviceName: galaxy-service
-      #          servicePort: 8090
-
-
+##TODO: review this
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: galaxy-ingress
+  # annotations:
+  #   nginx.ingress.kubernetes.io/rewrite-target: /$1
+spec:
+  rules:
+  - http:
+      paths:
+      # - path: /galaxy/?(.*)
+      - path: /
+        backend:
+          serviceName: galaxy
+          servicePort: 8090
 
 ---
 kind: Deployment
@@ -72,8 +72,7 @@ metadata:
   name: galaxy-web-deploy
   labels:
     app: galaxy
-    #thiw fies the error. But why??
-    #tier: web
+    tier: web
 spec:
   replicas: 1
   selector:
@@ -87,19 +86,25 @@ spec:
         tier: web
     spec:
       volumes: 
-        - name: galaxy-data
-          persistentVolumeClaim:
-            claimName: galaxy-pvc
+      - name: galaxy-job-conf-file
+        configMap:
+          name: galaxy-job-conf
+      - name: galaxy-data
+        persistentVolumeClaim:
+          claimName: galaxy-pvc
       containers:
-        - name: galaxy-web-container
-          image: nginx:1.7.9
-          #image: "galaxy/galaxy:minimal"
-          # add configmap!
-          ports:
-            - name: galaxy-http
-              containerPort: 8080
-              #command: ["/galaxy/server/.venv/bin/uwsgi"]
-              #args: ["--yaml", "/galaxy/server/config/galaxy.yml"]
-          volumeMounts:
-            - name: galaxy-data
-              mountPath: "/galaxy/server/database/"
+      - name: galaxy-web-container
+        image: "galaxy/galaxy:minimal"
+        #image: "ic4f/galaxy:minimal"
+        imagePullPolicy: "IfNotPresent"
+        #envFrom:
+        #- configMapRef:
+        
+        ports:
+        - name: galaxy-http
+          containerPort: 8080
+        command: ["/galaxy/server/.venv/bin/uwsgi"]
+        args: ["--yaml", "/galaxy/server/config/galaxy.yml"]
+        volumeMounts:
+        - name: galaxy-data
+          mountPath: "/galaxy/server/database/"
